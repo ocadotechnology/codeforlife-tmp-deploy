@@ -4,6 +4,8 @@ from game import python_den_urls
 from game import urls as game_urls
 from portal import urls as portal_urls
 
+from .views import HealthCheckView
+
 admin.autodiscover()
 
 urlpatterns = [
@@ -11,4 +13,5 @@ urlpatterns = [
     path("administration/", admin.site.urls),
     re_path(r"^rapidrouter/", include(game_urls)),
     re_path(r"^pythonden/", include(python_den_urls)),
+    path("health-check/", HealthCheckView.as_view(), name="health-check"),
 ]

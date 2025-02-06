@@ -1,4 +1,4 @@
-# TODO: Replace all the logic in this file with the equivalent permission for cloud scheduling on AWS
+# TODO: Replace all the Google-related logic in this file with the equivalent permission for cloud scheduling on AWS
 # NB: Might not be needed if we decide to convert the endpoints that need this permission to cron jobs
 
 import logging
@@ -6,6 +6,20 @@ import os
 
 from google.auth.transport import requests
 from google.oauth2 import id_token
+from rest_framework.permissions import AllowAny as _AllowAny
+from rest_framework.permissions import BasePermission as _BasePermission
+
+
+class BasePermission(_BasePermission):
+    """Base permission which all other permissions must inherit from."""
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__)
+
+
+class AllowAny(BasePermission, _AllowAny):
+    """Allows all incoming requests."""
+
 
 LOGGER = logging.getLogger(__name__)
 

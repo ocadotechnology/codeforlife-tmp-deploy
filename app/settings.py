@@ -1,4 +1,9 @@
 import json
+import os
+import sys
+import typing as t
+from pathlib import Path
+
 import boto3
 
 from .otp import AWS_S3_APP_BUCKET, RDS_DB_DATA_PATH
@@ -8,8 +13,6 @@ from .secrets import set_up_settings
 # Build paths inside the project like this: rel(rel_path)
 
 secrets = set_up_settings("my-service")
-
-from .secrets import *
 
 MODULE_NAME = secrets.MODULE_NAME
 BASE_DIR = Path(__file__).resolve().parent
