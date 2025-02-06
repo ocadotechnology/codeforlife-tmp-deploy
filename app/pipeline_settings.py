@@ -7,10 +7,10 @@ error.
 """
 
 # Build paths inside the project like this: rel(rel_path)
-import os
+from pathlib import Path
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-rel = lambda rel_path: os.path.join(BASE_DIR, rel_path)
+BASE_DIR = Path(__file__).resolve().parent
+rel = lambda rel_path: BASE_DIR.joinpath(rel_path)
 
 # Application definition
 
@@ -44,10 +44,8 @@ INSTALLED_APPS = (
 # Static files (CSS, JavaScript, Images)
 
 STATIC_URL = "/static/"
-
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
-
-MEDIA_ROOT = rel("static") + "/email_media/"
+STATIC_ROOT = BASE_DIR.joinpath("static")
+MEDIA_ROOT = STATIC_ROOT.joinpath("email_media")
 
 PIPELINE_ENABLED = False  # True if assets should be compressed, False if not.
 
@@ -78,4 +76,4 @@ STATICFILES_FINDERS = ["pipeline.finders.PipelineFinder"]
 STATICFILES_STORAGE = "pipeline.storage.PipelineStorage"
 
 # We only need to look into these 2 folders
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static/portal/"), os.path.join(BASE_DIR, "static/game/")]
+STATICFILES_DIRS = [STATIC_ROOT.joinpath("portal"), STATIC_ROOT.joinpath("game")]
