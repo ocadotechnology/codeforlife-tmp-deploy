@@ -1,5 +1,8 @@
+from django.core import management
+
 def main():
-    pass
+    management.call_command("collectstatic")
+    management.call_command("collectstatic", "--settings=pipeline_settings.py")
 
 
 if __name__ == "__main__":
