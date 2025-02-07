@@ -3,8 +3,7 @@ from django.urls import include, path, re_path
 from game import python_den_urls
 from game import urls as game_urls
 from portal import urls as portal_urls
-
-from .views import HealthCheckView
+from views import HealthCheckView
 
 admin.autodiscover()
 

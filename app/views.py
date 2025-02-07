@@ -4,6 +4,7 @@ import typing as t
 from dataclasses import dataclass
 from datetime import datetime
 
+from cfl.permissions import AllowAny
 from django.apps import apps
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -12,8 +13,6 @@ from rest_framework import status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
-from .permissions import AllowAny
 
 HealthStatus = t.Literal[
     "healthy",

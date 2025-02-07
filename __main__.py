@@ -1,8 +1,16 @@
-from django.core import management
+import subprocess
+
 
 def main():
-    management.call_command("collectstatic")
-    management.call_command("collectstatic", "--settings=pipeline_settings.py")
+    subprocess.run("python", "manage.py", "collectstatic", "--noinput", check=True)
+    subprocess.run(
+        "python",
+        "manage.py",
+        "collectstatic",
+        "settings=pipeline_settings",
+        "--noinput",
+        check=True,
+    )
 
 
 if __name__ == "__main__":

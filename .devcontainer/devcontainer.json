@@ -1,0 +1,64 @@
+{
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // general
+        "visualstudioexptteam.vscodeintellicode",
+        "redhat.vscode-yaml",
+        "davidanson.vscode-markdownlint",
+        "bierner.markdown-mermaid",
+        "streetsidesoftware.code-spell-checker",
+        "tamasfe.even-better-toml",
+        // "codecov.codecov", TODO: investigate how to stop spamming popups
+        "ritwickdey.liveserver",
+        "rangav.vscode-thunder-client",
+        "jock.svg",
+        "tyriar.luna-paint",
+        "dotenv.dotenv-vscode",
+        // git
+        "github.vscode-pull-request-github",
+        "github.vscode-github-actions",
+        "eamodio.gitlens",
+        // javascript
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        // python
+        "ms-python.python",
+        "ms-python.debugpy",
+        "ms-python.pylint",
+        "ms-python.isort",
+        "ms-python.vscode-pylance",
+        "ms-python.mypy-type-checker",
+        "ms-python.black-formatter",
+        "njpwerner.autodocstring",
+        // database
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-sqlite",
+        "mtxr.sqltools-driver-pg"
+      ]
+    }
+  },
+  "dockerComposeFile": [
+    "./docker-compose.yml"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "2.52.0"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "18"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "toolsToInstall": "pipenv==2024.0.2",
+      "version": "3.12"
+    }
+  },
+  "forwardPorts": [
+    8000, // Django
+    5432 // PostgreSQL
+  ],
+  "name": "workspace",
+  "remoteUser": "root",
+  "service": "app",
+  "workspaceFolder": "/codeforlife-tmp-deploy"
+}

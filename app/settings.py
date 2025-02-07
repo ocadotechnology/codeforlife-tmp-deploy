@@ -5,17 +5,15 @@ import typing as t
 from pathlib import Path
 
 import boto3
+from cfl.otp import AWS_S3_APP_BUCKET, RDS_DB_DATA_PATH
+from cfl.secrets import set_up_settings
 
-from .otp import AWS_S3_APP_BUCKET, RDS_DB_DATA_PATH
-from .permissions import is_cloud_scheduler
-from .secrets import set_up_settings
+Env = t.Literal["local", "development", "staging", "production"]
+ENV = t.cast(Env, os.getenv("ENV", "local"))
 
-# Build paths inside the project like this: rel(rel_path)
-
-secrets = set_up_settings("my-service")
-
-MODULE_NAME = secrets.MODULE_NAME
 BASE_DIR = Path(__file__).resolve().parent
+
+secrets = set_up_settings(BASE_DIR, "codeforlife")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = secrets.DJANGO_SECRET
@@ -33,10 +31,14 @@ DOTMAILER_GET_USER_BY_EMAIL_URL = secrets.DOTMAILER_GET_USER_BY_EMAIL_URL
 DOTMAILER_DELETE_USER_BY_ID_URL = secrets.DOTMAILER_DELETE_USER_BY_ID_URL
 DOTMAILER_PUT_CONSENT_DATA_URL = secrets.DOTMAILER_PUT_CONSENT_DATA_URL
 DOTMAILER_SEND_CAMPAIGN_URL = secrets.DOTMAILER_SEND_CAMPAIGN_URL
-DOTMAILER_THANKS_FOR_STAYING_CAMPAIGN_ID = secrets.DOTMAILER_THANKS_FOR_STAYING_CAMPAIGN_ID
+DOTMAILER_THANKS_FOR_STAYING_CAMPAIGN_ID = (
+    secrets.DOTMAILER_THANKS_FOR_STAYING_CAMPAIGN_ID
+)
 DOTMAILER_USER = secrets.DOTMAILER_USER
 DOTMAILER_PASSWORD = secrets.DOTMAILER_PASSWORD
-DOTMAILER_DEFAULT_PREFERENCES = json.loads(secrets.DOTMAILER_DEFAULT_PREFERENCES or "[]")
+DOTMAILER_DEFAULT_PREFERENCES = json.loads(
+    secrets.DOTMAILER_DEFAULT_PREFERENCES or "[]"
+)
 DOTDIGITAL_AUTH = secrets.DOTDIGITAL_AUTH
 
 # Application definition
@@ -92,12 +94,12 @@ AUTHENTICATION_BACKENDS = [
     "portal.backends.StudentLoginBackend",
 ]
 
-ROOT_URLCONF = "django_site.urls"
+ROOT_URLCONF = "urls"
 
-WSGI_APPLICATION = "django_site.wsgi.application"
+WSGI_APPLICATION = "application.app"
 
 SECURE_HSTS_SECONDS = 31536000  # One year
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = Env != "local"
 SECURE_REDIRECT_EXEMPT = [r"^cron/.*"]
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
@@ -113,15 +115,6 @@ CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False
 CSRF_FAILURE_VIEW = "deploy.views.csrf_failure"
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": f"redis://{secrets.REDIS_IP}:{secrets.REDIS_PORT}/0",
-        "KEY_PREFIX": secrets.CACHE_PREFIX,
-        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
-    }
-}
-
 # inject the lib folder into the python path
 lib_path = os.path.join(os.path.dirname(__file__), "lib")
 if lib_path not in sys.path:
@@ -135,7 +128,7 @@ PANDASSO_URL = secrets.PANDASSO_URL
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = Env == "local"
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
@@ -178,27 +171,33 @@ SITE_ID = 1
 
 # Deployment
 
-ALLOWED_HOSTS = [".appspot.com", ".codeforlife.education"]
+ALLOWED_HOSTS = ["*"] if ENV == "local" else [".appspot.com", ".codeforlife.education"]
+
 
 def get_databases():
-    # Get the dbdata object.
-    s3: "S3Client" = boto3.client("s3")
-    db_data_object = s3.get_object(
-        Bucket=t.cast(str, AWS_S3_APP_BUCKET), Key=RDS_DB_DATA_PATH
-    )
+    if ENV == "local":
+        name = os.getenv("DB_NAME", "codeforlife")
+        user = os.getenv("DB_USER", "root")
+        password = os.getenv("DB_PASSWORD", "password")
+        host = os.getenv("DB_HOST", "localhost")
+        port = int(os.getenv("DB_PORT", "5432"))
+    else:
+        # Get the dbdata object.
+        s3: "S3Client" = boto3.client("s3")
+        db_data_object = s3.get_object(
+            Bucket=t.cast(str, AWS_S3_APP_BUCKET), Key=RDS_DB_DATA_PATH
+        )
 
-    # Load the object as a JSON dict.
-    db_data = json.loads(
-        db_data_object["Body"].read().decode("utf-8")
-    )
-    if not db_data or db_data["DBEngine"] != "postgres":
-        raise ConnectionAbortedError("Invalid database data.")
+        # Load the object as a JSON dict.
+        db_data = json.loads(db_data_object["Body"].read().decode("utf-8"))
+        if not db_data or db_data["DBEngine"] != "postgres":
+            raise ConnectionAbortedError("Invalid database data.")
 
-    name = t.cast(str, db_data["Database"])
-    user = t.cast(str, db_data["user"])
-    password = t.cast(str, db_data["password"])
-    host = t.cast(str, db_data["Endpoint"])
-    port = t.cast(int, db_data["Port"])
+        name = t.cast(str, db_data["Database"])
+        user = t.cast(str, db_data["user"])
+        password = t.cast(str, db_data["password"])
+        host = t.cast(str, db_data["Endpoint"])
+        port = t.cast(int, db_data["Port"])
 
     return {
         "default": {
@@ -211,6 +210,7 @@ def get_databases():
             "ATOMIC_REQUESTS": True,
         }
     }
+
 
 DATABASES = get_databases()
 
@@ -252,9 +252,6 @@ TEMPLATES = [
 
 CMS_TEMPLATES = (("portal/base.html", "Template One"),)
 
-# TODO: Replace with equivalent AWS function when switching
-IS_CLOUD_SCHEDULER_FUNCTION = is_cloud_scheduler
-
 # TODO: Replace with S3 bucket link when switching
 CLOUD_STORAGE_PREFIX = "https://storage.googleapis.com/codeforlife-assets/"
 
@@ -265,102 +262,108 @@ def domain():
     """Returns the full domain depending on whether it's local, dev, staging or prod."""
     domain_name = "https://www.codeforlife.education"
 
-    if MODULE_NAME == "local":
+    if ENV == "local":
         domain_name = "localhost:8000"
-    elif MODULE_NAME == "staging" or MODULE_NAME == "dev":
-        domain_name = f"https://{MODULE_NAME}-dot-decent-digit-629.appspot.com"
+    elif ENV == "development":
+        domain_name = "https://dev-dot-decent-digit-629.appspot.com"
+    elif ENV == "staging":
+        domain_name = "https://staging-dot-decent-digit-629.appspot.com"
 
     return domain_name
 
 
 # CSP settings
 
-CSP_DEFAULT_SRC = ("self",)
-CSP_CONNECT_SRC = (
-    "'self'",
-    "https://*.onetrust.com/",
-    "https://api.pwnedpasswords.com",
-    "https://euc-widget.freshworks.com/",
-    "https://codeforlife.freshdesk.com/",
-    "https://api.iconify.design/",
-    "https://api.simplesvg.com/",
-    "https://api.unisvg.com/",
-    "https://www.google-analytics.com/",
-    "https://region1.google-analytics.com/g/",
-    "https://crowdin.com/",
-    "https://o2.mouseflow.com/",
-    "https://stats.g.doubleclick.net/",
-)
-CSP_FONT_SRC = (
-    "'self'",
-    "https://fonts.gstatic.com/",
-    "https://fonts.googleapis.com/",
-    "https://use.typekit.net/",
-)
-CSP_SCRIPT_SRC = (
-    "'self'",
-    "'unsafe-inline'",
-    "'unsafe-eval'",
-    "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js",
-    "https://cdn.crowdin.com/",
-    "https://*.onetrust.com/",
-    "https://code.jquery.com/",
-    "https://euc-widget.freshworks.com/",
-    "https://cdn-ukwest.onetrust.com/",
-    "https://code.iconify.design/2/2.0.3/iconify.min.js",
-    "https://www.googletagmanager.com/",
-    "https://www.google-analytics.com/analytics.js",
-    "https://cdn.mouseflow.com/",
-    "https://www.recaptcha.net/",
-    "https://www.google.com/recaptcha/",
-    "https://www.gstatic.com/recaptcha/",
-    "https://use.typekit.net/mrl4ieu.js",
-    f"{domain()}/static/portal/",
-    f"{domain()}/static/common/",
-)
-CSP_STYLE_SRC = (
-    "'self'",
-    "'unsafe-inline'",
-    "https://euc-widget.freshworks.com/",
-    "https://cdn-ukwest.onetrust.com/",
-    "https://fonts.googleapis.com/",
-    "https://code.jquery.com/ui/1.13.1/themes/base/jquery-ui.css",
-    "https://cdn.crowdin.com/",
-    f"{domain()}/static/portal/",
-)
-CSP_FRAME_SRC = (
-    "https://storage.googleapis.com/",
-    "https://www.youtube-nocookie.com/",
-    "https://www.recaptcha.net/",
-    "https://www.google.com/recaptcha/",
-    "https://crowdin.com/",
-    f"{domain()}/static/common/img/",
-    f"{domain()}/static/game/image/",
-)
-CSP_IMG_SRC = (
-    "https://storage.googleapis.com/codeforlife-assets/images/",
-    "https://cdn-ukwest.onetrust.com/",
-    "https://p.typekit.net/",
-    "https://cdn.crowdin.com/",
-    "https://crowdin-static.downloads.crowdin.com/",
-    "https://www.google-analytics.com/",
-    "data:",
-    f"{domain()}/static/portal/img/",
-    f"{domain()}/static/portal/static/portal/img/",
-    f"{domain()}/static/portal/img/",
-    f"{domain()}/favicon.ico",
-    f"{domain()}/img/",
-    f"{domain()}/account/two_factor/qrcode/",
-    f"{domain()}/static/",
-    f"{domain()}/static/game/image/",
-    f"{domain()}/static/game/raphael_image/",
-    f"{domain()}/static/game/js/blockly/media/",
-    f"{domain()}/static/icons/",
-)
-CSP_OBJECT_SRC = (f"{domain()}/static/common/img/", f"{domain()}/static/game/image/")
-CSP_MEDIA_SRC = (
-    f"{domain()}/static/game/sound/",
-    f"{domain()}/static/game/js/blockly/media/",
-    f"{domain()}/static/portal/video/",
-)
-CSP_MANIFEST_SRC = (f"{domain()}/static/manifest.json",)
+if ENV != "local":
+    CSP_DEFAULT_SRC = ("self",)
+    CSP_CONNECT_SRC = (
+        "'self'",
+        "https://*.onetrust.com/",
+        "https://api.pwnedpasswords.com",
+        "https://euc-widget.freshworks.com/",
+        "https://codeforlife.freshdesk.com/",
+        "https://api.iconify.design/",
+        "https://api.simplesvg.com/",
+        "https://api.unisvg.com/",
+        "https://www.google-analytics.com/",
+        "https://region1.google-analytics.com/g/",
+        "https://crowdin.com/",
+        "https://o2.mouseflow.com/",
+        "https://stats.g.doubleclick.net/",
+    )
+    CSP_FONT_SRC = (
+        "'self'",
+        "https://fonts.gstatic.com/",
+        "https://fonts.googleapis.com/",
+        "https://use.typekit.net/",
+    )
+    CSP_SCRIPT_SRC = (
+        "'self'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js",
+        "https://cdn.crowdin.com/",
+        "https://*.onetrust.com/",
+        "https://code.jquery.com/",
+        "https://euc-widget.freshworks.com/",
+        "https://cdn-ukwest.onetrust.com/",
+        "https://code.iconify.design/2/2.0.3/iconify.min.js",
+        "https://www.googletagmanager.com/",
+        "https://www.google-analytics.com/analytics.js",
+        "https://cdn.mouseflow.com/",
+        "https://www.recaptcha.net/",
+        "https://www.google.com/recaptcha/",
+        "https://www.gstatic.com/recaptcha/",
+        "https://use.typekit.net/mrl4ieu.js",
+        f"{domain()}/static/portal/",
+        f"{domain()}/static/common/",
+    )
+    CSP_STYLE_SRC = (
+        "'self'",
+        "'unsafe-inline'",
+        "https://euc-widget.freshworks.com/",
+        "https://cdn-ukwest.onetrust.com/",
+        "https://fonts.googleapis.com/",
+        "https://code.jquery.com/ui/1.13.1/themes/base/jquery-ui.css",
+        "https://cdn.crowdin.com/",
+        f"{domain()}/static/portal/",
+    )
+    CSP_FRAME_SRC = (
+        "https://storage.googleapis.com/",
+        "https://www.youtube-nocookie.com/",
+        "https://www.recaptcha.net/",
+        "https://www.google.com/recaptcha/",
+        "https://crowdin.com/",
+        f"{domain()}/static/common/img/",
+        f"{domain()}/static/game/image/",
+    )
+    CSP_IMG_SRC = (
+        "https://storage.googleapis.com/codeforlife-assets/images/",
+        "https://cdn-ukwest.onetrust.com/",
+        "https://p.typekit.net/",
+        "https://cdn.crowdin.com/",
+        "https://crowdin-static.downloads.crowdin.com/",
+        "https://www.google-analytics.com/",
+        "data:",
+        f"{domain()}/static/portal/img/",
+        f"{domain()}/static/portal/static/portal/img/",
+        f"{domain()}/static/portal/img/",
+        f"{domain()}/favicon.ico",
+        f"{domain()}/img/",
+        f"{domain()}/account/two_factor/qrcode/",
+        f"{domain()}/static/",
+        f"{domain()}/static/game/image/",
+        f"{domain()}/static/game/raphael_image/",
+        f"{domain()}/static/game/js/blockly/media/",
+        f"{domain()}/static/icons/",
+    )
+    CSP_OBJECT_SRC = (
+        f"{domain()}/static/common/img/",
+        f"{domain()}/static/game/image/",
+    )
+    CSP_MEDIA_SRC = (
+        f"{domain()}/static/game/sound/",
+        f"{domain()}/static/game/js/blockly/media/",
+        f"{domain()}/static/portal/video/",
+    )
+    CSP_MANIFEST_SRC = (f"{domain()}/static/manifest.json",)

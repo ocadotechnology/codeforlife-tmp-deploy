@@ -1,16 +1,14 @@
-"""
-Django settings for django-pipeline in codeforlife-deploy.
-This file is used to compile the 3 CSS files we need for the site.
-We have a whole separate file so that we can run collectstatic after all the other static files have been collected,
-so that the source and output files are under the same parent folder. This is to avoid causing a SuspiciousFileOperation
-error.
-"""
-
 # Build paths inside the project like this: rel(rel_path)
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-rel = lambda rel_path: BASE_DIR.joinpath(rel_path)
+rel = lambda rel_path: os.path.join(BASE_DIR, rel_path)
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv("DJANGO_SECRET", "NOT A SECRET")
+
+DEBUG = True
 
 # Application definition
 
@@ -62,7 +60,10 @@ PIPELINE = {
             ),
             "output_filename": "portal.css",
         },
-        "game-scss": {"source_filenames": (rel("static/game/sass/game.scss"),), "output_filename": "game.css"},
+        "game-scss": {
+            "source_filenames": (rel("static/game/sass/game.scss"),),
+            "output_filename": "game.css",
+        },
         "popup": {
             "source_filenames": (rel("static/portal/sass/partials/_popup.scss"),),
             "output_filename": "popup.css",
@@ -76,4 +77,8 @@ STATICFILES_FINDERS = ["pipeline.finders.PipelineFinder"]
 STATICFILES_STORAGE = "pipeline.storage.PipelineStorage"
 
 # We only need to look into these 2 folders
-STATICFILES_DIRS = [STATIC_ROOT.joinpath("portal"), STATIC_ROOT.joinpath("game")]
+STATICFILES_DIRS = [
+    BASE_DIR.joinpath("static"),
+    STATIC_ROOT.joinpath("portal"),
+    STATIC_ROOT.joinpath("game"),
+]
